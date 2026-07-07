@@ -13,15 +13,16 @@ def generate_uuid():
     return str(uuid.uuid4())
 
 
-class User(db.Model):
+class Member(db.Model):
     """A GroceryList member."""
+    __tablename__ = 'user'
 
     id = db.Column(db.String(36), primary_key=True, default=generate_uuid)
     username = db.Column(db.String(64), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
     created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
 
-    lists = db.relationship("GroceryList", backref="owner", lazy=True,
+    lists = db.relationship("GroceryList", backref="creator", lazy=True,
                             foreign_keys="GroceryList.created_by")
     added_items = db.relationship("Item", backref="adder", lazy=True,
                                   foreign_keys="Item.added_by")

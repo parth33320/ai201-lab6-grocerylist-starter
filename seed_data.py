@@ -12,7 +12,7 @@ This script creates:
 
 from datetime import datetime, timedelta, timezone
 from app import create_app, db
-from models import User, GroceryList, Item
+from models import Member, GroceryList, Item
 
 
 def seed():
@@ -24,10 +24,10 @@ def seed():
         now = datetime.now(timezone.utc)
 
         # ------------------------------------------------------------------
-        # Users
+        # Members
         # ------------------------------------------------------------------
-        maya = User(username="maya", email="maya@grocerylist.app")
-        leo = User(username="leo", email="leo@grocerylist.app")
+        maya = Member(username="maya", email="maya@grocerylist.app")
+        leo = Member(username="leo", email="leo@grocerylist.app")
         db.session.add_all([maya, leo])
         db.session.flush()
 
@@ -94,7 +94,7 @@ def seed():
               f"({sum(1 for i in weekly_items + party_items if not i.is_purchased)} unpurchased, "
               f"{sum(1 for i in weekly_items + party_items if i.is_purchased)} purchased)")
         print()
-        print("User IDs (use these to test the API):")
+        print("Member IDs (use these to test the API):")
         print(f"  maya: {maya.id}")
         print(f"  leo:  {leo.id}")
         print()
