@@ -6,7 +6,7 @@ Business logic for grocery lists and their items.
 
 from datetime import datetime, timezone
 from extensions import db
-from models import User, GroceryList, Item
+from models import Member, GroceryList, Item
 
 
 # ---------------------------------------------------------------------------
@@ -29,18 +29,18 @@ def create_list(name: str, created_by: str, is_shared: bool = False) -> GroceryL
 
     Args:
         name:       Display name for the list.
-        created_by: ID of the user creating the list.
-        is_shared:  Whether other users can view and add to this list.
+        created_by: ID of the member creating the list.
+        is_shared:  Whether other members can view and add to this list.
 
     Returns:
         The newly created GroceryList.
 
     Raises:
-        ValueError: If the user does not exist.
+        ValueError: If the member does not exist.
     """
-    user = db.session.get(User, created_by)
-    if not user:
-        raise ValueError(f"User {created_by!r} not found")
+    member = db.session.get(Member, created_by)
+    if not member:
+        raise ValueError(f"Member {created_by!r} not found")
 
     grocery_list = GroceryList(name=name, created_by=created_by, is_shared=is_shared)
     db.session.add(grocery_list)
@@ -100,15 +100,15 @@ def add_item(
         The newly created Item.
 
     Raises:
-        ValueError: If the list or user does not exist.
+        ValueError: If the list or member does not exist.
     """
     grocery_list = db.session.get(GroceryList, list_id)
     if not grocery_list:
         raise ValueError(f"List {list_id!r} not found")
 
-    user = db.session.get(User, added_by)
-    if not user:
-        raise ValueError(f"User {added_by!r} not found")
+    member = db.session.get(Member, added_by)
+    if not member:
+        raise ValueError(f"Member {added_by!r} not found")
 
     item = Item(
         list_id=list_id,
@@ -150,3 +150,77 @@ def mark_purchased(list_id: str, item_id: str, user_id: str) -> Item:
     item.purchased_at = datetime.now(timezone.utc)
     db.session.commit()
     return item
+
+
+def purchase_all_items(list_id: str, user_id: str) -> int:
+    """
+    Mark all unpurchased items in a list as purchased.
+
+    Args:
+        list_id: ID of the grocery list.
+        user_id: ID of the member performing the bulk purchase.
+
+    Returns:
+        The number of items newly marked as purchased.
+
+    Raises:
+        ValueError: If the list or member does not exist.
+    """
+    grocery_list = db.session.get(GroceryList, list_id)
+    if not grocery_list:
+        raise ValueError(f"List {list_id!r} not found")
+
+    member = db.session.get(Member, user_id)
+    if not member:
+        raise ValueError(f"Member {user_id!r} not found")
+
+    unpurchased_items = Item.query.filter_by(list_id=list_id, is_purchased=False).all()
+    count = len(unpurchased_items)
+
+    now = datetime.now(timezone.utc)
+    for item in unpurchased_items:
+        item.is_purchased = True
+        item.purchased_by = user_id
+        item.purchased_at = now
+
+    db.session.commit()
+    return count
+
+
+def get_list_stats(list_id: str) -> dict:
+    """
+    Compute summary statistics for a grocery list.
+
+    Returns a dict with:
+        list_id      — the list ID
+        total_items  — total number of items on the list
+        purchased    — number of items marked as purchased
+        remaining    — number of items not yet purchased
+        by_category  — item counts of REMAINING items grouped by category
+
+    Raises:
+        ValueError: If the list does not exist.
+    """
+    grocery_list = db.session.get(GroceryList, list_id)
+    if not grocery_list:
+        raise ValueError(f"List {list_id!r} not found")
+
+    items = Item.query.filter_by(list_id=list_id).all()
+
+    total = len(items)
+    purchased = sum(1 for item in items if item.is_purchased)
+    remaining = total - purchased
+
+    by_category = {}
+    for item in items:
+        if not item.is_purchased:
+            cat = item.category or "uncategorized"
+            by_category[cat] = by_category.get(cat, 0) + 1
+
+    return {
+        "list_id": list_id,
+        "total_items": total,
+        "purchased": purchased,
+        "remaining": remaining,
+        "by_category": by_category,
+    }
